@@ -29,12 +29,17 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py \
  && rm get-pip.py \
  && pip3 install jupyter pandas prettytable
 
-
 ## Download spark and hadoop dependencies and install
 
 # Optional env variables
 ENV SPARK_HOME=${SPARK_HOME:-"/opt/spark"}
 ENV HADOOP_HOME=${HADOOP_HOME:-"/opt/hadoop"}
+
+ENV AWS_ACCESS_KEY_ID="ENTER HERE"
+ENV AWS_TEST_BUCKET="ENTER HERE"
+ENV AWS_SECRET_ACCESS_KEY="ENTER HERE"
+ENV AWS_TEST_ACCOUNT_ID="ENTER HERE"
+ENV AWS_REGION="ENTER HERE"
 
 RUN mkdir -p ${HADOOP_HOME} && mkdir -p ${SPARK_HOME}
 WORKDIR ${SPARK_HOME}
@@ -47,16 +52,14 @@ RUN curl https://dlcdn.apache.org/spark/spark-3.1.2/spark-3.1.2-bin-hadoop3.2.tg
 RUN tar xvzf spark-3.1.2-bin-hadoop3.2.tgz --directory /opt/spark --strip-components 1 \
  && rm -rf spark-3.1.2-bin-hadoop3.2.tgz
 
-RUN curl https://jdbc.postgresql.org/download/postgresql-42.2.24.jar -o postgresql-42.2.24.jar \
- && cp postgresql-42.2.24.jar /opt/spark/jars \
- && cp postgresql-42.2.24.jar /opt/hadoop/share/hadoop/common \
- && rm postgresql-42.2.24.jar
+RUN for pkg in core auth utils http-client-spi regions aws-core sdk-core url-connection-client profiles aws-json-protocol metrics-spi protocol-core json-utils third-party-jackson-core aws-xml-protocol aws-query-protocol glue s3 kms dynamodb sqs sns; do curl https://repo1.maven.org/maven2/software/amazon/awssdk/${pkg}/2.17.130/${pkg}-2.17.130.jar -o aws-${pkg}.jar && cp aws-${pkg}.jar /opt/spark/jars; done
 
-RUN mkdir -p /home/iceberg/data
-RUN curl https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2020-04.csv -o /home/iceberg/data/yello_tripdata_2020-04.csv
+COPY spark-defaults.conf /opt/spark/conf
+COPY iceberg-spark-runtime-3.1.jar /opt/spark/jars/iceberg-spark3-runtime.jar
+RUN curl https://repo1.maven.org/maven2/org/reactivestreams/reactive-streams/1.0.3/reactive-streams-1.0.3.jar -o reactive-streams-1.0.3.jar && cp reactive-streams-1.0.3.jar /opt/spark/jars
 
-RUN mkdir -p /home/iceberg/localwarehouse /home/iceberg/notebooks /home/iceberg/warehouse /home/iceberg/spark-events
-COPY ["notebooks/Iceberg - Getting Started.ipynb", "/home/iceberg/notebooks"]
+RUN mkdir -p /home/iceberg/notebooks /home/iceberg/spark-events
+COPY ["notebooks/spark-sql-demo.ipynb", "/home/iceberg/notebooks"]
 
 # Add a pyspark-notebook command for convenience
 RUN echo '#! /bin/sh' >> /bin/pyspark-notebook \
@@ -68,8 +71,6 @@ RUN echo '#! /bin/sh' >> /bin/pyspark-notebook \
 RUN mkdir -p /root/.ipython/profile_default/startup
 COPY ipython/startup/00-prettytables.py /root/.ipython/profile_default/startup
 COPY ipython/startup/README /root/.ipython/profile_default/startup
-
-COPY spark-defaults.conf /opt/spark/conf
 
 COPY entrypoint.sh .
 

@@ -186,4 +186,4 @@ metastore_db
 # Postgres data
 warehouse
 postgres
-notebooks
+./notebooks
